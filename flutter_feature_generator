@@ -1,0 +1,171 @@
+#!/bin/bash
+
+# Accept the feature name as a CLI argument
+if [ -z "$1" ]; then
+  echo "❌ Usage: cf <feature_name>"
+  exit 1
+fi
+
+# Join all args as the feature name (handles spaces and kebab-case)
+raw_input="$*"
+
+# Convert to lowercase + remove special characters to use in paths
+name=$(echo "$raw_input" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/_/g')
+
+# Convert to PascalCase for class name
+className=$(echo "$name" | awk -F'_' '{ for (i=1; i<=NF; i++) $i=toupper(substr($i,1,1)) substr($i,2); } 1' OFS='')
+
+base_path="lib/features/$name"
+
+# Create folder structure
+mkdir -p $base_path/{data/datasources,data/models,data/repositories,\
+domain/entities,domain/repositories,domain/usecases,\
+presentation/screens,presentation/widgets,presentation/controller}
+
+# ========== DATA LAYER ==========
+
+# Remote Data Source
+cat > $base_path/data/datasources/${name}_remote_datasource.dart <<EOF
+abstract class ${className}RemoteDataSource {
+  Future<String> fetchData(); // Example method
+}
+EOF
+
+cat > $base_path/data/datasources/${name}_remote_datasource_impl.dart <<EOF
+import 'package:dio/dio.dart';
+import '${name}_remote_datasource.dart';
+
+class ${className}RemoteDataSourceImpl implements ${className}RemoteDataSource {
+  final Dio dio;
+
+  ${className}RemoteDataSourceImpl(this.dio);
+
+  @override
+  Future<String> fetchData() async {
+    final response = await dio.get('https://api.example.com/$name');
+    return response.data.toString(); // Replace with real model
+  }
+}
+EOF
+
+# Local Data Source
+cat > $base_path/data/datasources/${name}_local_datasource.dart <<EOF
+abstract class ${className}LocalDataSource {
+  Future<String> fetchCachedData();
+}
+EOF
+
+cat > $base_path/data/datasources/${name}_local_datasource_impl.dart <<EOF
+import '${name}_local_datasource.dart';
+
+class ${className}LocalDataSourceImpl implements ${className}LocalDataSource {
+  @override
+  Future<String> fetchCachedData() async {
+    // TODO: Implement local data access
+    return 'cached_$name';
+  }
+}
+EOF
+
+# Model
+cat > $base_path/data/models/${name}_model.dart <<EOF
+class ${className}Model {
+  final String id;
+
+  ${className}Model({required this.id});
+
+  factory ${className}Model.fromJson(Map<String, dynamic> json) {
+    return ${className}Model(id: json['id']);
+  }
+
+  Map<String, dynamic> toJson() => {'id': id};
+}
+EOF
+
+# Repository Implementation
+cat > $base_path/data/repositories/${name}_repository_impl.dart <<EOF
+import '../../domain/repositories/${name}_repository.dart';
+import '../datasources/${name}_remote_datasource.dart';
+
+class ${className}RepositoryImpl implements ${className}Repository {
+  final ${className}RemoteDataSource remoteDataSource;
+
+  ${className}RepositoryImpl(this.remoteDataSource);
+
+  @override
+  void fetchData() {
+    // Example method
+    remoteDataSource.fetchData();
+  }
+}
+EOF
+
+# ========== DOMAIN LAYER ==========
+
+cat > $base_path/domain/entities/${name}_entity.dart <<EOF
+class ${className}Entity {
+  final String id;
+
+  const ${className}Entity({required this.id});
+}
+EOF
+
+cat > $base_path/domain/repositories/${name}_repository.dart <<EOF
+abstract class ${className}Repository {
+  void fetchData();
+}
+EOF
+
+cat > $base_path/domain/usecases/get_${name}_usecase.dart <<EOF
+import '../repositories/${name}_repository.dart';
+
+class Get${className}UseCase {
+  final ${className}Repository repository;
+
+  Get${className}UseCase(this.repository);
+
+  void call() {
+    repository.fetchData();
+  }
+}
+EOF
+
+# ========== PRESENTATION LAYER ==========
+
+cat > $base_path/presentation/screens/${name}_screen.dart <<EOF
+import 'package:flutter/material.dart';
+
+class ${className}Screen extends StatelessWidget {
+  const ${className}Screen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('${className}')),
+      body: Center(child: Text('${className} Screen')),
+    );
+  }
+}
+EOF
+
+cat > $base_path/presentation/widgets/${name}_card.dart <<EOF
+import 'package:flutter/material.dart';
+
+class ${className}Card extends StatelessWidget {
+  final String title;
+
+  const ${className}Card({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(title),
+      ),
+    );
+  }
+}
+EOF
+
+echo "✅ Clean Architecture with abstract + impl data sources for '$name' feature created!"
