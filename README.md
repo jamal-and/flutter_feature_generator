@@ -1,54 +1,67 @@
-Flutter Feature Generator
-A simple Bash-based CLI tool to generate Clean Architecture feature folders for Flutter apps.
+# 🏗️ Flutter Feature Generator
 
-🛠 Installation
-Clone this repo:
+A lightweight Bash script to generate Flutter **feature folders** using **Clean Architecture** — fast, consistent, and ready for scaling.
 
-git clone https://github.com/YOUR_USERNAME/flutter_feature_gen.git
+---
+
+## 🚀 Install
+
+```bash
+git clone https://github.com/jamal-and/flutter_feature_gen.git
 cd flutter_feature_gen
-
-Run the installer:
-
 ./install.sh
+source ~/.bashrc   # or source ~/.zshrc
+```
 
-Restart your terminal or reload your shell config:
+---
 
-source ~/.bashrc
+## ✅ Usage
 
-or
-source ~/.zshrc
-
-🚀 Usage
-To generate a new feature structure, just run:
-
-cf feature-name
-
-Examples:
-
+```bash
 cf nutrition_log
-cf meal-plan
+```
 
-The generator supports kebab-case, snake_case, and multi-word input — and creates the appropriate PascalCase class names (e.g., MealPlan).
+This will generate:
 
-📁 Output Structure Example
-For input meal-plan, it generates:
-
-lib/features/meal_plan/
+```
+lib/features/nutrition_log/
 ├── data/
-│ ├── datasources/
-│ │ ├── meal_plan_remote_datasource.dart
-│ │ ├── meal_plan_remote_datasource_impl.dart
-│ │ ├── meal_plan_local_datasource.dart
-│ │ └── meal_plan_local_datasource_impl.dart
-│ ├── models/meal_plan_model.dart
-│ └── repositories/meal_plan_repository_impl.dart
+│   ├── datasources/
+│   │   ├── nutrition_log_remote_datasource.dart
+│   │   └── nutrition_log_remote_datasource_impl.dart
+│   │   ├── nutrition_log_local_datasource.dart
+│   │   └── nutrition_log_local_datasource_impl.dart
+│   ├── models/
+│   │   └── nutrition_log_model.dart
+│   └── repositories/
+│       └── nutrition_log_repository_impl.dart
 ├── domain/
-│ ├── entities/meal_plan_entity.dart
-│ ├── repositories/meal_plan_repository.dart
-│ └── usecases/get_meal_plan_usecase.dart
+│   ├── entities/
+│   │   └── nutrition_log_entity.dart
+│   ├── repositories/
+│   │   └── nutrition_log_repository.dart
+│   └── usecases/
+│       └── get_nutrition_log_usecase.dart
 ├── presentation/
-│ ├── screens/meal_plan_screen.dart
-│ └── widgets/meal_plan_card.dart
+│   ├── screens/
+│   │   └── nutrition_log_screen.dart
+│   ├── widgets/
+│   │   └── nutrition_log_card.dart
+│   └── controller/
+└── ...
+```
 
-🧠 Philosophy
-This tool follows Clean Architecture principles and is optimized for Flutter developers who want to ship scalable, maintainable apps fast.
+Each file includes boilerplate code for models, repositories, data sources, use cases, and UI widgets.
+
+---
+
+## 🔥 What It Does
+
+- Instantly generates folders and files for a complete feature
+- Implements Clean Architecture best practices
+- Includes abstract and implementation layers
+- Adds a shortcut command: `cf`
+
+---
+
+MIT License
