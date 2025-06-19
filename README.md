@@ -1,0 +1,1 @@
+# flutter_feature_generator
