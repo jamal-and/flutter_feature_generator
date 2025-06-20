@@ -18,35 +18,35 @@ source ~/.zshrc    # or source ~/.bashrc
 ## ✅ Usage
 
 ```bash
-cf nutrition_log
+cf feature_name
 ```
 
 This will generate:
 
 ```
-lib/features/nutrition_log/
+lib/features/feature_name/
 ├── data/
 │   ├── datasources/
-│   │   ├── nutrition_log_remote_datasource.dart
-│   │   └── nutrition_log_remote_datasource_impl.dart
-│   │   ├── nutrition_log_local_datasource.dart
-│   │   └── nutrition_log_local_datasource_impl.dart
+│   │   ├── feature_name_remote_datasource.dart
+│   │   └── feature_name_remote_datasource_impl.dart
+│   │   ├── feature_name_local_datasource.dart
+│   │   └── feature_name_local_datasource_impl.dart
 │   ├── models/
-│   │   └── nutrition_log_model.dart
+│   │   └── feature_name_model.dart
 │   └── repositories/
-│       └── nutrition_log_repository_impl.dart
+│       └── feature_name_repository_impl.dart
 ├── domain/
 │   ├── entities/
-│   │   └── nutrition_log_entity.dart
+│   │   └── feature_name_entity.dart
 │   ├── repositories/
-│   │   └── nutrition_log_repository.dart
+│   │   └── feature_name_repository.dart
 │   └── usecases/
-│       └── get_nutrition_log_usecase.dart
+│       └── get_feature_name_usecase.dart
 ├── presentation/
 │   ├── screens/
-│   │   └── nutrition_log_screen.dart
+│   │   └── feature_name_screen.dart
 │   ├── widgets/
-│   │   └── nutrition_log_card.dart
+│   │   └── feature_name_card.dart
 │   └── controller/
 └── ...
 ```
