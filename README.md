@@ -7,10 +7,10 @@ A lightweight Bash script to generate Flutter **feature folders** using **Clean 
 ## 🚀 Install
 
 ```bash
-git clone https://github.com/jamal-and/flutter_feature_gen.git
-cd flutter_feature_gen
+git clone https://github.com/jamal-and/flutter_feature_generator.git
+cd flutter_feature_generator
 ./install.sh
-source ~/.bashrc   # or source ~/.zshrc
+source ~/.zshrc    # or source ~/.bashrc
 ```
 
 ---
