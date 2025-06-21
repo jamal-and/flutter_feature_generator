@@ -83,20 +83,7 @@ lib/features/your_feature/
         └── your_feature_card.dart
 ```
 
-## 💡 Examples
-
-### E-commerce App Features
-
-```bash
-# Product catalog with Riverpod
-cf "Product Catalog" --riverpod --freezed-model --test
-
-# User authentication with Bloc
-cf "User Auth" --bloc --equatable --test
-
-# Shopping cart with Cubit
-cf "Shopping Cart" --cubit --freezed-model --test
-```
+## 💡 Example
 
 ### Social Media App Features
 
@@ -108,7 +95,7 @@ cf "Social Feed" --riverpod --freezed-model --test
 cf "User Profile" --bloc --equatable --test
 
 # Chat system
-cf "Chat Messages" --cubit --freezed-model
+cf "Chat" --cubit --freezed-model
 ```
 
 ## 🎯 State Management Patterns
