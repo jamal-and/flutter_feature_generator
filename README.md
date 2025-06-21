@@ -6,7 +6,7 @@
 
 - 🏗️ **Clean Architecture**: Generates proper Data → Domain → Presentation layer structure
 - 🧠 **Multiple State Management**: Support for Riverpod, Bloc, and Cubit
-- 🔧 **Flexible Models**: Choose between Freezed or Equatable for immutable models
+- ❄️ **Freezed Support**: Unified immutable models and state classes
 - 🧪 **Test Generation**: Complete test suite generation with proper mocking
 - 📁 **Smart Naming**: Automatic conversion from natural language to proper Dart conventions
 - ⚡ **Zero Configuration**: Works out of the box with sensible defaults
@@ -20,7 +20,6 @@ git clone https://github.com/jamal-and/flutter_feature_generator.git
 cd flutter_feature_generator
 ./install.sh
 source ~/.zshrc    # or source ~/.bashrc
-```
 
 ### Basic Usage
 
@@ -28,8 +27,8 @@ source ~/.zshrc    # or source ~/.bashrc
 # Generate a basic feature
 cf "User Profile"
 
-# Generate with Riverpod + Freezed models + tests
-cf "Shopping Cart" --riverpod --freezed-model --test
+# Generate with Riverpod + Freezed + tests
+cf "Shopping Cart" --riverpod --freezed --test
 
 # Generate with Bloc + Equatable models + tests
 cf "Product Details" --bloc --equatable --test
@@ -38,19 +37,16 @@ cf "Product Details" --bloc --equatable --test
 ## 📋 Command Syntax
 
 ```bash
-cf <feature_name> [state_management] [model_type] [options]
+cf <feature_name> [state_management] [options]
 ```
 
 ### State Management Options
-- `--riverpod` - Riverpod Notifier with Freezed state
+- `--riverpod` - Riverpod Notifier
 - `--bloc` - Bloc pattern (Event + State + Bloc)
 - `--cubit` - Cubit pattern (simplified Bloc)
 
-### Model Type Options
-- `--freezed-model` - Immutable models with Freezed
-- `--equatable` - Equatable-based models
-
 ### Feature Options
+- `freezed` - Use Freezed for immutable models and state classes
 - `--test` - Generate comprehensive test files
 
 ## 🏗️ Generated Structure
@@ -89,13 +85,13 @@ lib/features/your_feature/
 
 ```bash
 # User feed with advanced state management
-cf "Social Feed" --riverpod --freezed-model --test
+cf "Social Feed" --riverpod --freezed --test
 
 # Profile management
-cf "User Profile" --bloc --equatable --test
+cf "User Profile" --bloc --test
 
 # Chat system
-cf "Chat" --cubit --freezed-model
+cf "Chat" --cubit --freezed
 ```
 
 ## 🎯 State Management Patterns
@@ -173,8 +169,7 @@ dependencies:
   dio: ^5.3.2
   flutter_riverpod:   # if --riverpod
   flutter_bloc:       # if --bloc or --cubit
-  freezed:            # if --freezed-model
-  equatable:          # if --equatable
+  freezed_annotation: # if --freezed
   json_annotation: 
 ```
 
@@ -186,7 +181,7 @@ dev_dependencies:
   mocktail: 
   bloc_test:           # if --bloc or --cubit
   build_runner:        # if using Freezed
-  freezed:             # if --freezed-model
+  freezed:             # if --freezed
   json_serializable: 
 ```
 
@@ -205,9 +200,8 @@ cf "User Profile API"  # → user_profile_api (handles multiple words)
 ### Build Runner Integration
 For Freezed-based features, don't forget to run:
 ```bash
-dart run build_runner build
-# or for watching changes
-dart run build_runner watch
+dart dart run build_runner build --delete-conflicting-outputs
+
 ```
 
 ## 🎨 Customization
