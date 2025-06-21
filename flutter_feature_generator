@@ -1,37 +1,126 @@
 #!/bin/bash
 
-# Accept the feature name as a CLI argument
-if [ -z "$1" ]; then
-  echo "❌ Usage: cf <feature_name>"
+# ========== GLOBAL VARIABLES ==========
+declare -a valid_state_flags=("--riverpod" "--bloc" "--cubit")
+declare -a valid_model_flags=("--freezed-model" "--equatable")
+declare -a valid_feature_flags=("--test")
+declare state_mgmt=""
+declare model_type=""
+declare generate_tests=false
+declare -a feature_parts=()
+declare raw_input=""
+declare name=""
+declare className=""
+declare base_path=""
+
+# ========== UTILITY FUNCTIONS ==========
+
+show_help() {
+  echo ""
+  echo "📦 Clean Feature Generator"
+  echo ""
+  echo "🧠 Usage:"
+  echo "  cf <feature_name> [--riverpod|--bloc|--cubit] [--freezed-model|--equatable] [--test]"
+  echo ""
+  echo "🔧 Options:"
+  echo "  --riverpod         Use Riverpod Notifier with Freezed state"
+  echo "  --bloc             Use Bloc (Event + State + Bloc with Freezed)"
+  echo "  --cubit            Use Cubit (State + Cubit class)"
+  echo "  --freezed-model    Use Freezed for Model & Entity classes"
+  echo "  --equatable        Use Equatable for Model & Entity classes"
+  echo "  --test             Generate test files for all layers"
+  echo ""
+  echo "📝 Example:"
+  echo "  cf Player Stats --bloc --equatable --test"
+  echo "  cf Match Details --riverpod --freezed-model --test"
+  echo ""
   exit 1
-fi
+}
 
-# Join all args as the feature name (handles spaces and kebab-case)
-raw_input="$*"
+parse_arguments() {
+  for arg in "$@"; do
+    case "$arg" in
+      --riverpod|--bloc|--cubit)
+        if [ -n "$state_mgmt" ]; then
+          echo "❌ Error: Multiple state management flags provided: '$state_mgmt' and '$arg'"
+          show_help
+          exit 1
+        fi
+        state_mgmt="${arg#--}"
+        ;;
+      --freezed-model|--equatable)
+        if [ -n "$model_type" ]; then
+          echo "❌ Error: Multiple model type flags provided: '$model_type' and '$arg'"
+          show_help
+          exit 1
+        fi
+        model_type="${arg#--}"
+        ;;
+      --test)
+        generate_tests=true
+        ;;
+      --*)
+        echo "❌ Unknown flag: '$arg'"
+        show_help
+        exit 1
+        ;;
+      -*)
+        # Catch single-dash arguments (likely typos or incorrect flags)
+        echo "❌ Invalid flag: '$arg'"
+        echo "💡 Did you mean one of these?"
+        echo "   State management: --riverpod, --bloc, --cubit"
+        echo "   Model types: --freezed-model, --equatable"
+        echo "   Feature flags: --test"
+        echo "   Note: All flags must start with double dashes (--)"
+        exit 1
+        ;;
+      *)
+        feature_parts+=("$arg")
+        ;;
+    esac
+  done
+}
 
-# Convert to lowercase + remove special characters to use in paths
-name=$(echo "$raw_input" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/_/g')
+validate_and_setup_names() {
+  raw_input="${feature_parts[*]}"
+  if [ -z "$raw_input" ]; then
+    echo "❌ Error: Feature name is required."
+    show_help
+    exit 1
+  fi
 
-# Convert to PascalCase for class name
-className=$(echo "$name" | awk -F'_' '{ for (i=1; i<=NF; i++) $i=toupper(substr($i,1,1)) substr($i,2); } 1' OFS='')
+  # Convert to lowercase + remove special characters to use in paths
+  name=$(echo "$raw_input" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/_/g')
 
-base_path="lib/features/$name"
+  # Convert to PascalCase for class name
+  className=$(echo "$name" | awk -F'_' '{ for (i=1; i<=NF; i++) $i=toupper(substr($i,1,1)) substr($i,2); } 1' OFS='')
 
-# Create folder structure
-mkdir -p $base_path/{data/datasources,data/models,data/repositories,\
+  base_path="lib/features/$name"
+}
+
+create_folder_structure() {
+  mkdir -p "$base_path"/{data/datasources,data/models,data/repositories,\
 domain/entities,domain/repositories,domain/usecases,\
 presentation/screens,presentation/widgets,presentation/controller}
 
-# ========== DATA LAYER ==========
+  # Create test folders if --test flag is provided
+  if [ "$generate_tests" = true ]; then
+    mkdir -p "test/features/$name"/{data/datasources,data/models,data/repositories,\
+domain/entities,domain/repositories,domain/usecases,\
+presentation/screens,presentation/widgets,presentation/controller}
+  fi
+}
 
-# Remote Data Source
-cat > $base_path/data/datasources/${name}_remote_datasource.dart <<EOF
+# ========== DATA LAYER GENERATORS ==========
+
+generate_remote_datasource() {
+  cat > "$base_path/data/datasources/${name}_remote_datasource.dart" <<EOF
 abstract class ${className}RemoteDataSource {
   Future<String> fetchData(); // Example method
 }
 EOF
 
-cat > $base_path/data/datasources/${name}_remote_datasource_impl.dart <<EOF
+  cat > "$base_path/data/datasources/${name}_remote_datasource_impl.dart" <<EOF
 import 'package:dio/dio.dart';
 import '${name}_remote_datasource.dart';
 
@@ -47,15 +136,16 @@ class ${className}RemoteDataSourceImpl implements ${className}RemoteDataSource {
   }
 }
 EOF
+}
 
-# Local Data Source
-cat > $base_path/data/datasources/${name}_local_datasource.dart <<EOF
+generate_local_datasource() {
+  cat > "$base_path/data/datasources/${name}_local_datasource.dart" <<EOF
 abstract class ${className}LocalDataSource {
   Future<String> fetchCachedData();
 }
 EOF
 
-cat > $base_path/data/datasources/${name}_local_datasource_impl.dart <<EOF
+  cat > "$base_path/data/datasources/${name}_local_datasource_impl.dart" <<EOF
 import '${name}_local_datasource.dart';
 
 class ${className}LocalDataSourceImpl implements ${className}LocalDataSource {
@@ -66,9 +156,49 @@ class ${className}LocalDataSourceImpl implements ${className}LocalDataSource {
   }
 }
 EOF
+}
 
-# Model
-cat > $base_path/data/models/${name}_model.dart <<EOF
+generate_model() {
+  case "$model_type" in
+    "freezed-model")
+      cat > "$base_path/data/models/${name}_model.dart" <<EOF
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part '${name}_model.freezed.dart';
+part '${name}_model.g.dart';
+
+@freezed
+abstract class ${className}Model with _\$${className}Model {
+  const factory ${className}Model({
+    required String id,
+  }) = _${className}Model;
+
+  factory ${className}Model.fromJson(Map<String, dynamic> json) => _\$${className}ModelFromJson(json);
+}
+EOF
+      ;;
+    "equatable")
+      cat > "$base_path/data/models/${name}_model.dart" <<EOF
+import 'package:equatable/equatable.dart';
+
+class ${className}Model extends Equatable {
+  final String id;
+
+  const ${className}Model({required this.id});
+
+  factory ${className}Model.fromJson(Map<String, dynamic> json) {
+    return ${className}Model(id: json['id']);
+  }
+
+  Map<String, dynamic> toJson() => {'id': id};
+
+  @override
+  List<Object?> get props => [id];
+}
+EOF
+      ;;
+    *)
+      cat > "$base_path/data/models/${name}_model.dart" <<EOF
 class ${className}Model {
   final String id;
 
@@ -81,9 +211,12 @@ class ${className}Model {
   Map<String, dynamic> toJson() => {'id': id};
 }
 EOF
+      ;;
+  esac
+}
 
-# Repository Implementation
-cat > $base_path/data/repositories/${name}_repository_impl.dart <<EOF
+generate_repository_impl() {
+  cat > "$base_path/data/repositories/${name}_repository_impl.dart" <<EOF
 import '../../domain/repositories/${name}_repository.dart';
 import '../datasources/${name}_remote_datasource.dart';
 
@@ -99,24 +232,70 @@ class ${className}RepositoryImpl implements ${className}Repository {
   }
 }
 EOF
+}
 
-# ========== DOMAIN LAYER ==========
+generate_data_layer() {
+  echo "📊 Generating Data Layer..."
+  generate_remote_datasource
+  generate_local_datasource
+  generate_model
+  generate_repository_impl
+}
 
-cat > $base_path/domain/entities/${name}_entity.dart <<EOF
+# ========== DOMAIN LAYER GENERATORS ==========
+
+generate_entity() {
+  case "$model_type" in
+    "freezed-model")
+      cat > "$base_path/domain/entities/${name}_entity.dart" <<EOF
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part '${name}_entity.freezed.dart';
+
+@freezed
+abstract class ${className}Entity with _\$${className}Entity {
+  const factory ${className}Entity({
+    required String id,
+  }) = _${className}Entity;
+}
+EOF
+      ;;
+    "equatable")
+      cat > "$base_path/domain/entities/${name}_entity.dart" <<EOF
+import 'package:equatable/equatable.dart';
+
+class ${className}Entity extends Equatable {
+  final String id;
+
+  const ${className}Entity({required this.id});
+
+  @override
+  List<Object?> get props => [id];
+}
+EOF
+      ;;
+    *)
+      cat > "$base_path/domain/entities/${name}_entity.dart" <<EOF
 class ${className}Entity {
   final String id;
 
   const ${className}Entity({required this.id});
 }
 EOF
+      ;;
+  esac
+}
 
-cat > $base_path/domain/repositories/${name}_repository.dart <<EOF
+generate_repository_interface() {
+  cat > "$base_path/domain/repositories/${name}_repository.dart" <<EOF
 abstract class ${className}Repository {
   void fetchData();
 }
 EOF
+}
 
-cat > $base_path/domain/usecases/get_${name}_usecase.dart <<EOF
+generate_usecase() {
+  cat > "$base_path/domain/usecases/get_${name}_usecase.dart" <<EOF
 import '../repositories/${name}_repository.dart';
 
 class Get${className}UseCase {
@@ -129,10 +308,19 @@ class Get${className}UseCase {
   }
 }
 EOF
+}
 
-# ========== PRESENTATION LAYER ==========
+generate_domain_layer() {
+  echo "🏗️ Generating Domain Layer..."
+  generate_entity
+  generate_repository_interface
+  generate_usecase
+}
 
-cat > $base_path/presentation/screens/${name}_screen.dart <<EOF
+# ========== PRESENTATION LAYER GENERATORS ==========
+
+generate_screen() {
+  cat > "$base_path/presentation/screens/${name}_screen.dart" <<EOF
 import 'package:flutter/material.dart';
 
 class ${className}Screen extends StatelessWidget {
@@ -147,8 +335,10 @@ class ${className}Screen extends StatelessWidget {
   }
 }
 EOF
+}
 
-cat > $base_path/presentation/widgets/${name}_card.dart <<EOF
+generate_widget() {
+  cat > "$base_path/presentation/widgets/${name}_card.dart" <<EOF
 import 'package:flutter/material.dart';
 
 class ${className}Card extends StatelessWidget {
@@ -167,5 +357,616 @@ class ${className}Card extends StatelessWidget {
   }
 }
 EOF
+}
 
-echo "✅ Clean Architecture with abstract + impl data sources for '$name' feature created!"
+generate_presentation_layer() {
+  echo "🎨 Generating Presentation Layer..."
+  generate_screen
+  generate_widget
+}
+
+# ========== STATE MANAGEMENT GENERATORS ==========
+
+generate_riverpod_controller() {
+  echo "🧠 Generating Riverpod Notifier + Freezed State with part-of structure..."
+
+  cat > "$base_path/presentation/controller/${name}_controller.dart" <<EOF
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part '${name}_controller.freezed.dart';
+part '${name}_state.dart';
+
+class ${className}Controller extends Notifier<${className}State> {
+  @override
+  ${className}State build() => const ${className}State();
+
+  Future<void> loadData() async {
+    state = state.copyWith(isLoading: true);
+    try {
+      // Simulate API call
+      await Future.delayed(const Duration(seconds: 1));
+      state = state.copyWith(isLoading: false, data: 'Fetched!');
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+}
+EOF
+
+  cat > "$base_path/presentation/controller/${name}_state.dart" <<EOF
+part of '${name}_controller.dart';
+
+@freezed
+abstract class ${className}State with _\$${className}State {
+  const factory ${className}State({
+    @Default(false) bool isLoading,
+    String? data,
+    String? error,
+  }) = _${className}State;
+}
+EOF
+}
+
+generate_bloc_controller() {
+  echo "🧠 Generating Bloc + Freezed Event/State with part-of structure..."
+
+  cat > "$base_path/presentation/controller/${name}_bloc.dart" <<EOF
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part '${name}_bloc.freezed.dart';
+part '${name}_event.dart';
+part '${name}_state.dart';
+
+class ${className}Bloc extends Bloc<${className}Event, ${className}State> {
+  ${className}Bloc() : super(const ${className}State.initial()) {
+    on<_FetchData>((event, emit) async {
+      emit(const ${className}State.loading());
+      try {
+        await Future.delayed(const Duration(seconds: 1));
+        emit(const ${className}State.loaded('Fetched!'));
+      } catch (e) {
+        emit(${className}State.error(e.toString()));
+      }
+    });
+  }
+}
+EOF
+
+  cat > "$base_path/presentation/controller/${name}_event.dart" <<EOF
+part of '${name}_bloc.dart';
+
+@freezed
+class ${className}Event with _\$${className}Event {
+  const factory ${className}Event.started() = _Started;
+  const factory ${className}Event.fetchData() = _FetchData;
+}
+EOF
+
+  cat > "$base_path/presentation/controller/${name}_state.dart" <<EOF
+part of '${name}_bloc.dart';
+
+@freezed
+class ${className}State with _\$${className}State {
+  const factory ${className}State.initial() = _Initial;
+  const factory ${className}State.loading() = _Loading;
+  const factory ${className}State.loaded(String data) = _Loaded;
+  const factory ${className}State.error(String message) = _Error;
+}
+EOF
+}
+
+generate_cubit_controller() {
+  echo "🧠 Generating Cubit + Freezed State with part-of structure..."
+
+  cat > "$base_path/presentation/controller/${name}_cubit.dart" <<EOF
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part '${name}_cubit.freezed.dart';
+part '${name}_state.dart';
+
+class ${className}Cubit extends Cubit<${className}State> {
+  ${className}Cubit() : super(const ${className}State.initial());
+
+  Future<void> loadData() async {
+    emit(const ${className}State.loading());
+    try {
+      await Future.delayed(const Duration(seconds: 1));
+      emit(const ${className}State.loaded('Fetched!'));
+    } catch (e) {
+      emit(${className}State.error(e.toString()));
+    }
+  }
+}
+EOF
+
+  cat > "$base_path/presentation/controller/${name}_state.dart" <<EOF
+part of '${name}_cubit.dart';
+
+@freezed
+class ${className}State with _\$${className}State {
+  const factory ${className}State.initial() = _Initial;
+  const factory ${className}State.loading() = _Loading;
+  const factory ${className}State.loaded(String data) = _Loaded;
+  const factory ${className}State.error(String message) = _Error;
+}
+EOF
+}
+
+generate_state_management() {
+  case "$state_mgmt" in
+    "riverpod")
+      generate_riverpod_controller
+      ;;
+    "bloc")
+      generate_bloc_controller
+      ;;
+    "cubit")
+      generate_cubit_controller
+      ;;
+  esac
+}
+
+# ========== TEST GENERATORS ==========
+
+generate_datasource_tests() {
+  cat > "test/features/$name/data/datasources/${name}_remote_datasource_test.dart" <<EOF
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
+import 'package:mockito/annotations.dart';
+import 'package:dio/dio.dart';
+import '../../../../../lib/features/$name/data/datasources/${name}_remote_datasource_impl.dart';
+
+import '${name}_remote_datasource_test.mocks.dart';
+
+@GenerateMocks([Dio])
+void main() {
+  late ${className}RemoteDataSourceImpl dataSource;
+  late MockDio mockDio;
+
+  setUp(() {
+    mockDio = MockDio();
+    dataSource = ${className}RemoteDataSourceImpl(mockDio);
+  });
+
+  group('${className}RemoteDataSource', () {
+    test('should return data when the call is successful', () async {
+      // arrange
+      const tResponseData = 'test_data';
+      when(mockDio.get(any)).thenAnswer(
+        (_) async => Response(
+          data: tResponseData,
+          statusCode: 200,
+          requestOptions: RequestOptions(path: ''),
+        ),
+      );
+
+      // act
+      final result = await dataSource.fetchData();
+
+      // assert
+      expect(result, tResponseData);
+      verify(mockDio.get('https://api.example.com/$name'));
+    });
+
+    test('should throw exception when the call fails', () async {
+      // arrange
+      when(mockDio.get(any)).thenThrow(DioException(
+        requestOptions: RequestOptions(path: ''),
+        message: 'Network error',
+      ));
+
+      // act & assert
+      expect(() => dataSource.fetchData(), throwsA(isA<DioException>()));
+    });
+  });
+}
+EOF
+
+  cat > "test/features/$name/data/datasources/${name}_local_datasource_test.dart" <<EOF
+import 'package:flutter_test/flutter_test.dart';
+import '../../../../../lib/features/$name/data/datasources/${name}_local_datasource_impl.dart';
+
+void main() {
+  late ${className}LocalDataSourceImpl dataSource;
+
+  setUp(() {
+    dataSource = ${className}LocalDataSourceImpl();
+  });
+
+  group('${className}LocalDataSource', () {
+    test('should return cached data', () async {
+      // act
+      final result = await dataSource.fetchCachedData();
+
+      // assert
+      expect(result, 'cached_$name');
+    });
+  });
+}
+EOF
+}
+
+generate_model_tests() {
+  cat > "test/features/$name/data/models/${name}_model_test.dart" <<EOF
+import 'dart:convert';
+import 'package:flutter_test/flutter_test.dart';
+import '../../../../../lib/features/$name/data/models/${name}_model.dart';
+
+void main() {
+  const t${className}Model = ${className}Model(id: '123');
+
+  group('${className}Model', () {
+    test('should be a valid model', () {
+      // assert
+      expect(t${className}Model.id, '123');
+    });
+
+    test('should return a valid JSON map', () {
+      // act
+      final result = t${className}Model.toJson();
+
+      // assert
+      final expectedMap = {'id': '123'};
+      expect(result, expectedMap);
+    });
+
+    test('should return a valid model from JSON', () {
+      // arrange
+      final jsonMap = {'id': '123'};
+
+      // act
+      final result = ${className}Model.fromJson(jsonMap);
+
+      // assert
+      expect(result, t${className}Model);
+    });
+  });
+}
+EOF
+}
+
+generate_repository_tests() {
+  cat > "test/features/$name/data/repositories/${name}_repository_impl_test.dart" <<EOF
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
+import 'package:mockito/annotations.dart';
+import '../../../../../lib/features/$name/data/datasources/${name}_remote_datasource.dart';
+import '../../../../../lib/features/$name/data/repositories/${name}_repository_impl.dart';
+
+class Mock${className}RemoteDataSource extends Mock implements ${className}RemoteDataSource {}
+
+void main() {
+  late ${className}RepositoryImpl repository;
+  late Mock${className}RemoteDataSource mockRemoteDataSource;
+
+  setUp(() {
+    mockRemoteDataSource = Mock${className}RemoteDataSource();
+    repository = ${className}RepositoryImpl(mockRemoteDataSource);
+  });
+
+  group('${className}Repository', () {
+    test('should call remote data source when fetching data', () {
+      // act
+      repository.fetchData();
+
+      // assert
+      verify(mockRemoteDataSource.fetchData());
+    });
+  });
+}
+EOF
+}
+
+generate_entity_tests() {
+  cat > "test/features/$name/domain/entities/${name}_entity_test.dart" <<EOF
+import 'package:flutter_test/flutter_test.dart';
+import '../../../../../lib/features/$name/domain/entities/${name}_entity.dart';
+
+void main() {
+  const t${className}Entity = ${className}Entity(id: '123');
+
+  group('${className}Entity', () {
+    test('should be a valid entity', () {
+      // assert
+      expect(t${className}Entity.id, '123');
+    });
+
+    test('should support equality comparison', () {
+      // arrange
+      const t${className}Entity2 = ${className}Entity(id: '123');
+
+      // assert
+      expect(t${className}Entity, t${className}Entity2);
+    });
+  });
+}
+EOF
+}
+
+generate_usecase_tests() {
+  cat > "test/features/$name/domain/usecases/get_${name}_usecase_test.dart" <<EOF
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
+import '../../../../../lib/features/$name/domain/repositories/${name}_repository.dart';
+import '../../../../../lib/features/$name/domain/usecases/get_${name}_usecase.dart';
+
+class Mock${className}Repository extends Mock implements ${className}Repository {}
+
+void main() {
+  late Get${className}UseCase usecase;
+  late Mock${className}Repository mockRepository;
+
+  setUp(() {
+    mockRepository = Mock${className}Repository();
+    usecase = Get${className}UseCase(mockRepository);
+  });
+
+  group('Get${className}UseCase', () {
+    test('should call repository when executed', () {
+      // act
+      usecase.call();
+
+      // assert
+      verify(mockRepository.fetchData());
+    });
+  });
+}
+EOF
+}
+
+generate_widget_tests() {
+  cat > "test/features/$name/presentation/widgets/${name}_card_test.dart" <<EOF
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../../../../../lib/features/$name/presentation/widgets/${name}_card.dart';
+
+void main() {
+  group('${className}Card', () {
+    testWidgets('should display the provided title', (tester) async {
+      // arrange
+      const testTitle = 'Test Title';
+
+      // act
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: ${className}Card(title: testTitle),
+          ),
+        ),
+      );
+
+      // assert
+      expect(find.text(testTitle), findsOneWidget);
+      expect(find.byType(Card), findsOneWidget);
+    });
+  });
+}
+EOF
+
+  cat > "test/features/$name/presentation/screens/${name}_screen_test.dart" <<EOF
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../../../../../lib/features/$name/presentation/screens/${name}_screen.dart';
+
+void main() {
+  group('${className}Screen', () {
+    testWidgets('should display app bar and content', (tester) async {
+      // act
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: ${className}Screen(),
+        ),
+      );
+
+      // assert
+      expect(find.text('${className}'), findsNWidgets(2)); // AppBar + Body
+      expect(find.text('${className} Screen'), findsOneWidget);
+      expect(find.byType(AppBar), findsOneWidget);
+    });
+  });
+}
+EOF
+}
+
+generate_controller_tests() {
+  case "$state_mgmt" in
+    "riverpod")
+      cat > "test/features/$name/presentation/controller/${name}_controller_test.dart" <<EOF
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../../lib/features/$name/presentation/controller/${name}_controller.dart';
+
+void main() {
+  group('${className}Controller', () {
+    late ProviderContainer container;
+
+    setUp(() {
+      container = ProviderContainer();
+    });
+
+    tearDown(() {
+      container.dispose();
+    });
+
+    test('should have initial state', () {
+      // arrange
+      final controller = ${className}Controller();
+
+      // act
+      final initialState = controller.build();
+
+      // assert
+      expect(initialState.isLoading, false);
+      expect(initialState.data, null);
+      expect(initialState.error, null);
+    });
+
+    test('should update state when loading data', () async {
+      // arrange
+      final controller = ${className}Controller();
+      controller.build(); // Initialize
+
+      // act
+      final loadFuture = controller.loadData();
+      
+      // assert loading state
+      expect(controller.state.isLoading, true);
+      
+      // wait for completion
+      await loadFuture;
+      
+      // assert final state
+      expect(controller.state.isLoading, false);
+      expect(controller.state.data, 'Fetched!');
+    });
+  });
+}
+EOF
+      ;;
+    "bloc")
+      cat > "test/features/$name/presentation/controller/${name}_bloc_test.dart" <<EOF
+import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../../../../../lib/features/$name/presentation/controller/${name}_bloc.dart';
+
+void main() {
+  group('${className}Bloc', () {
+    late ${className}Bloc bloc;
+
+    setUp(() {
+      bloc = ${className}Bloc();
+    });
+
+    tearDown(() {
+      bloc.close();
+    });
+
+    test('initial state should be initial', () {
+      expect(bloc.state, const ${className}State.initial());
+    });
+
+    blocTest<${className}Bloc, ${className}State>(
+      'should emit [loading, loaded] when fetchData is added',
+      build: () => bloc,
+      act: (bloc) => bloc.add(const ${className}Event.fetchData()),
+      expect: () => [
+        const ${className}State.loading(),
+        const ${className}State.loaded('Fetched!'),
+      ],
+    );
+  });
+}
+EOF
+      ;;
+    "cubit")
+      cat > "test/features/$name/presentation/controller/${name}_cubit_test.dart" <<EOF
+import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../../../../../lib/features/$name/presentation/controller/${name}_cubit.dart';
+
+void main() {
+  group('${className}Cubit', () {
+    late ${className}Cubit cubit;
+
+    setUp(() {
+      cubit = ${className}Cubit();
+    });
+
+    tearDown(() {
+      cubit.close();
+    });
+
+    test('initial state should be initial', () {
+      expect(cubit.state, const ${className}State.initial());
+    });
+
+    blocTest<${className}Cubit, ${className}State>(
+      'should emit [loading, loaded] when loadData is called',
+      build: () => cubit,
+      act: (cubit) => cubit.loadData(),
+      expect: () => [
+        const ${className}State.loading(),
+        const ${className}State.loaded('Fetched!'),
+      ],
+    );
+  });
+}
+EOF
+      ;;
+  esac
+}
+
+generate_test_layer() {
+  if [ "$generate_tests" = true ]; then
+    echo "🧪 Generating Test Files..."
+    generate_datasource_tests
+    generate_model_tests
+    generate_repository_tests
+    generate_entity_tests
+    generate_usecase_tests
+    generate_widget_tests
+    
+    # Generate controller tests only if state management is specified
+    if [ -n "$state_mgmt" ]; then
+      generate_controller_tests
+    fi
+  fi
+}
+
+# ========== MAIN EXECUTION FUNCTIONS ==========
+
+show_build_runner_reminder() {
+  if [[ "$state_mgmt" == "riverpod" || "$state_mgmt" == "bloc" || "$model_type" == "freezed-model" ]]; then
+    echo "⚙️  Don't forget to run: dart run build_runner build"
+  fi
+}
+
+show_success_message() {
+  echo "✅ Feature '$name' generated successfully!"
+  if [ "$generate_tests" = true ]; then
+    echo "🧪 Test files generated in test/features/$name/"
+    echo "📦 Don't forget to add these dependencies to dev_dependencies:"
+    echo "   - mockito:"
+    echo "   - build_runner:"
+    if [[ "$state_mgmt" == "bloc" || "$state_mgmt" == "cubit" ]]; then
+      echo "   - bloc_test:"
+    fi
+  fi
+}
+
+main() {
+  # Check if the user requested help
+  if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    show_help
+  fi
+
+  # Parse and validate arguments
+  parse_arguments "$@"
+  validate_and_setup_names
+
+  # Create the structure
+  create_folder_structure
+
+  # Generate all layers
+  generate_data_layer
+  generate_domain_layer
+  generate_presentation_layer
+
+  # Generate state management if specified
+  if [ -n "$state_mgmt" ]; then
+    generate_state_management
+  fi
+
+  # Generate tests if --test flag is provided
+  generate_test_layer
+
+  # Show final reminders and success message
+  show_build_runner_reminder
+  show_success_message
+}
+
+# Execute main function with all arguments
+main "$@"
