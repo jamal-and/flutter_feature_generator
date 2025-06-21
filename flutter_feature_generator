@@ -2,10 +2,10 @@
 
 # ========== GLOBAL VARIABLES ==========
 declare -a valid_state_flags=("--riverpod" "--bloc" "--cubit")
-declare -a valid_model_flags=("--freezed-model" "--equatable")
-declare -a valid_feature_flags=("--test")
+# CHANGED: Removed --freezed-model and --equatable since we're using --freezed for everything
+declare -a valid_feature_flags=("--test" "--freezed")  # Added --freezed flag here
 declare state_mgmt=""
-declare model_type=""
+declare use_freezed=false  # Added global freezed flag
 declare generate_tests=false
 declare -a feature_parts=()
 declare raw_input=""
@@ -20,22 +20,22 @@ show_help() {
   echo "📦 Clean Feature Generator"
   echo ""
   echo "🧠 Usage:"
-  echo "  cf <feature_name> [--riverpod|--bloc|--cubit] [--freezed-model|--equatable] [--test]"
+  echo "  cf <feature_name> [--riverpod|--bloc|--cubit] [--freezed] [--test]"
   echo ""
   echo "🔧 Options:"
-  echo "  --riverpod         Use Riverpod Notifier with Freezed state"
-  echo "  --bloc             Use Bloc (Event + State + Bloc with Freezed)"
-  echo "  --cubit            Use Cubit (State + Cubit class)"
-  echo "  --freezed-model    Use Freezed for Model & Entity classes"
-  echo "  --equatable        Use Equatable for Model & Entity classes"
+  echo "  --riverpod         Use Riverpod Notifier"
+  echo "  --bloc             Use Bloc pattern"
+  echo "  --cubit            Use Cubit pattern"
+  echo "  --freezed          Use Freezed for State/Model/Entity classes"  # CHANGED: Simplified help
   echo "  --test             Generate test files for all layers"
   echo ""
   echo "📝 Example:"
-  echo "  cf Player Stats --bloc --equatable --test"
-  echo "  cf Match Details --riverpod --freezed-model --test"
+  echo "  cf Player Stats --bloc --freezed --test"
+  echo "  cf Match Details --riverpod --freezed"
   echo ""
   exit 1
 }
+
 
 parse_arguments() {
   for arg in "$@"; do
@@ -48,13 +48,8 @@ parse_arguments() {
         fi
         state_mgmt="${arg#--}"
         ;;
-      --freezed-model|--equatable)
-        if [ -n "$model_type" ]; then
-          echo "❌ Error: Multiple model type flags provided: '$model_type' and '$arg'"
-          show_help
-          exit 1
-        fi
-        model_type="${arg#--}"
+      --freezed)  # CHANGED: Combined freezed for both state and models
+        use_freezed=true
         ;;
       --test)
         generate_tests=true
@@ -65,13 +60,10 @@ parse_arguments() {
         exit 1
         ;;
       -*)
-        # Catch single-dash arguments (likely typos or incorrect flags)
         echo "❌ Invalid flag: '$arg'"
         echo "💡 Did you mean one of these?"
         echo "   State management: --riverpod, --bloc, --cubit"
-        echo "   Model types: --freezed-model, --equatable"
-        echo "   Feature flags: --test"
-        echo "   Note: All flags must start with double dashes (--)"
+        echo "   Feature flags: --freezed, --test"
         exit 1
         ;;
       *)
@@ -80,6 +72,7 @@ parse_arguments() {
     esac
   done
 }
+
 
 validate_and_setup_names() {
   raw_input="${feature_parts[*]}"
@@ -97,6 +90,7 @@ validate_and_setup_names() {
 
   base_path="lib/features/$name"
 }
+
 
 create_folder_structure() {
   mkdir -p "$base_path"/{data/datasources,data/models,data/repositories,\
@@ -159,9 +153,8 @@ EOF
 }
 
 generate_model() {
-  case "$model_type" in
-    "freezed-model")
-      cat > "$base_path/data/models/${name}_model.dart" <<EOF
+  if [ "$use_freezed" = true ]; then  # CHANGED: Only check freezed flag now
+    cat > "$base_path/data/models/${name}_model.dart" <<EOF
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part '${name}_model.freezed.dart';
@@ -176,12 +169,9 @@ abstract class ${className}Model with _\$${className}Model {
   factory ${className}Model.fromJson(Map<String, dynamic> json) => _\$${className}ModelFromJson(json);
 }
 EOF
-      ;;
-    "equatable")
-      cat > "$base_path/data/models/${name}_model.dart" <<EOF
-import 'package:equatable/equatable.dart';
-
-class ${className}Model extends Equatable {
+  else
+    cat > "$base_path/data/models/${name}_model.dart" <<EOF
+class ${className}Model {
   final String id;
 
   const ${className}Model({required this.id});
@@ -191,29 +181,11 @@ class ${className}Model extends Equatable {
   }
 
   Map<String, dynamic> toJson() => {'id': id};
-
-  @override
-  List<Object?> get props => [id];
 }
 EOF
-      ;;
-    *)
-      cat > "$base_path/data/models/${name}_model.dart" <<EOF
-class ${className}Model {
-  final String id;
-
-  ${className}Model({required this.id});
-
-  factory ${className}Model.fromJson(Map<String, dynamic> json) {
-    return ${className}Model(id: json['id']);
-  }
-
-  Map<String, dynamic> toJson() => {'id': id};
+  fi
 }
-EOF
-      ;;
-  esac
-}
+
 
 generate_repository_impl() {
   cat > "$base_path/data/repositories/${name}_repository_impl.dart" <<EOF
@@ -245,9 +217,8 @@ generate_data_layer() {
 # ========== DOMAIN LAYER GENERATORS ==========
 
 generate_entity() {
-  case "$model_type" in
-    "freezed-model")
-      cat > "$base_path/domain/entities/${name}_entity.dart" <<EOF
+  if [ "$use_freezed" = true ]; then  # CHANGED: Only check freezed flag now
+    cat > "$base_path/domain/entities/${name}_entity.dart" <<EOF
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part '${name}_entity.freezed.dart';
@@ -259,32 +230,17 @@ abstract class ${className}Entity with _\$${className}Entity {
   }) = _${className}Entity;
 }
 EOF
-      ;;
-    "equatable")
-      cat > "$base_path/domain/entities/${name}_entity.dart" <<EOF
-import 'package:equatable/equatable.dart';
-
-class ${className}Entity extends Equatable {
-  final String id;
-
-  const ${className}Entity({required this.id});
-
-  @override
-  List<Object?> get props => [id];
-}
-EOF
-      ;;
-    *)
-      cat > "$base_path/domain/entities/${name}_entity.dart" <<EOF
+  else
+    cat > "$base_path/domain/entities/${name}_entity.dart" <<EOF
 class ${className}Entity {
   final String id;
 
   const ${className}Entity({required this.id});
 }
 EOF
-      ;;
-  esac
+  fi
 }
+
 
 generate_repository_interface() {
   cat > "$base_path/domain/repositories/${name}_repository.dart" <<EOF
@@ -368,9 +324,10 @@ generate_presentation_layer() {
 # ========== STATE MANAGEMENT GENERATORS ==========
 
 generate_riverpod_controller() {
-  echo "🧠 Generating Riverpod Notifier + Freezed State with part-of structure..."
-
-  cat > "$base_path/presentation/controller/${name}_controller.dart" <<EOF
+  if [ "$use_freezed" = true ]; then  # CHANGED: Added freezed check
+    echo "🧠 Generating Riverpod Notifier with Freezed State..."
+    
+    cat > "$base_path/presentation/controller/${name}_controller.dart" <<EOF
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -381,10 +338,9 @@ class ${className}Controller extends Notifier<${className}State> {
   @override
   ${className}State build() => const ${className}State();
 
-  Future<void> loadData() async {
+  Future<void> fetchData() async {
     state = state.copyWith(isLoading: true);
     try {
-      // Simulate API call
       await Future.delayed(const Duration(seconds: 1));
       state = state.copyWith(isLoading: false, data: 'Fetched!');
     } catch (e) {
@@ -394,7 +350,7 @@ class ${className}Controller extends Notifier<${className}State> {
 }
 EOF
 
-  cat > "$base_path/presentation/controller/${name}_state.dart" <<EOF
+    cat > "$base_path/presentation/controller/${name}_state.dart" <<EOF
 part of '${name}_controller.dart';
 
 @freezed
@@ -406,12 +362,77 @@ abstract class ${className}State with _\$${className}State {
   }) = _${className}State;
 }
 EOF
+  else
+    echo "🧠 Generating Riverpod Notifier with plain state..."
+    
+    cat > "$base_path/presentation/controller/${name}_controller.dart" <<EOF
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+class ${className}State {
+  final bool isLoading;
+  final String? data;
+  final String? error;
+
+  const ${className}State({
+    this.isLoading = false,
+    this.data,
+    this.error,
+  });
+
+  ${className}State copyWith({
+    bool? isLoading,
+    String? data,
+    String? error,
+  }) {
+    return ${className}State(
+      isLoading: isLoading ?? this.isLoading,
+      data: data ?? this.data,
+      error: error ?? this.error,
+    );
+  }
 }
 
-generate_bloc_controller() {
-  echo "🧠 Generating Bloc + Freezed Event/State with part-of structure..."
+class ${className}Controller extends Notifier<${className}State> {
+  @override
+  ${className}State build() => const ${className}State();
 
-  cat > "$base_path/presentation/controller/${name}_bloc.dart" <<EOF
+  Future<void> fetchData() async {
+    state = state.copyWith(isLoading: true);
+    try {
+      await Future.delayed(const Duration(seconds: 1));
+      state = state.copyWith(isLoading: false, data: 'Fetched!');
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+}
+EOF
+  fi
+
+  if [ "$use_freezed" = true ]; then
+  cat >> "$base_path/presentation/controller/${name}_controller.dart" <<EOF
+
+final ${name}ControllerProvider = NotifierProvider<${className}Controller, ${className}State>(
+  () => ${className}Controller(),
+);
+EOF
+else
+  cat >> "$base_path/presentation/controller/${name}_controller.dart" <<EOF
+
+final ${name}ControllerProvider = NotifierProvider<${className}Controller, ${className}State>(
+  () => ${className}Controller(),
+);
+EOF
+fi
+}
+
+
+generate_bloc_controller() {
+  if [ "$use_freezed" = true ]; then
+    echo "🧠 Generating BLoC with Freezed Event/State..."
+    
+    # Bloc file
+    cat > "$base_path/presentation/controller/${name}_bloc.dart" <<EOF
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -424,8 +445,9 @@ class ${className}Bloc extends Bloc<${className}Event, ${className}State> {
     on<_FetchData>((event, emit) async {
       emit(const ${className}State.loading());
       try {
+        // TODO: Implement your data fetching logic
         await Future.delayed(const Duration(seconds: 1));
-        emit(const ${className}State.loaded('Fetched!'));
+        emit(const ${className}State.loaded('Fetched data'));
       } catch (e) {
         emit(${className}State.error(e.toString()));
       }
@@ -434,17 +456,18 @@ class ${className}Bloc extends Bloc<${className}Event, ${className}State> {
 }
 EOF
 
-  cat > "$base_path/presentation/controller/${name}_event.dart" <<EOF
+    # Event file
+    cat > "$base_path/presentation/controller/${name}_event.dart" <<EOF
 part of '${name}_bloc.dart';
 
 @freezed
 class ${className}Event with _\$${className}Event {
-  const factory ${className}Event.started() = _Started;
   const factory ${className}Event.fetchData() = _FetchData;
 }
 EOF
 
-  cat > "$base_path/presentation/controller/${name}_state.dart" <<EOF
+    # State file
+    cat > "$base_path/presentation/controller/${name}_state.dart" <<EOF
 part of '${name}_bloc.dart';
 
 @freezed
@@ -455,12 +478,73 @@ class ${className}State with _\$${className}State {
   const factory ${className}State.error(String message) = _Error;
 }
 EOF
+
+  else
+    echo "🧠 Generating BLoC with plain Dart classes..."
+    
+    # Bloc file
+    cat > "$base_path/presentation/controller/${name}_bloc.dart" <<EOF
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '${name}_event.dart';
+import '${name}_state.dart';
+
+class ${className}Bloc extends Bloc<${className}Event, ${className}State> {
+  ${className}Bloc() : super(${className}State.initial()) {
+    on<Fetch${className}Event>((event, emit) async {
+      emit(${className}State.loading());
+      try {
+        // TODO: Implement your data fetching logic
+        await Future.delayed(const Duration(seconds: 1));
+        emit(${className}State.loaded('Fetched data'));
+      } catch (e) {
+        emit(${className}State.error(e.toString()));
+      }
+    });
+  }
+}
+EOF
+
+    # Event file
+    cat > "$base_path/presentation/controller/${name}_event.dart" <<EOF
+abstract class ${className}Event {}
+
+class Fetch${className}Event extends ${className}Event {}
+EOF
+
+    # State file
+    cat > "$base_path/presentation/controller/${name}_state.dart" <<EOF
+class ${className}State {
+  final bool isLoading;
+  final String? data;
+  final String? error;
+
+  const ${className}State({
+    required this.isLoading,
+    this.data,
+    this.error,
+  });
+
+  factory ${className}State.initial() => const ${className}State(isLoading: false);
+  factory ${className}State.loading() => const ${className}State(isLoading: true);
+  factory ${className}State.loaded(String data) => ${className}State(
+        isLoading: false,
+        data: data,
+      );
+  factory ${className}State.error(String message) => ${className}State(
+        isLoading: false,
+        error: message,
+      );
+}
+EOF
+  fi
 }
 
 generate_cubit_controller() {
-  echo "🧠 Generating Cubit + Freezed State with part-of structure..."
+  if [ "$use_freezed" = true ]; then
+    echo "🧠 Generating Cubit with Freezed State..."
 
-  cat > "$base_path/presentation/controller/${name}_cubit.dart" <<EOF
+    # Cubit file
+    cat > "$base_path/presentation/controller/${name}_cubit.dart" <<EOF
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -470,11 +554,12 @@ part '${name}_state.dart';
 class ${className}Cubit extends Cubit<${className}State> {
   ${className}Cubit() : super(const ${className}State.initial());
 
-  Future<void> loadData() async {
+  Future<void> fetchData() async {
     emit(const ${className}State.loading());
     try {
+      // TODO: Implement data fetching logic
       await Future.delayed(const Duration(seconds: 1));
-      emit(const ${className}State.loaded('Fetched!'));
+      emit(const ${className}State.loaded('Data loaded successfully'));
     } catch (e) {
       emit(${className}State.error(e.toString()));
     }
@@ -482,7 +567,8 @@ class ${className}Cubit extends Cubit<${className}State> {
 }
 EOF
 
-  cat > "$base_path/presentation/controller/${name}_state.dart" <<EOF
+    # State file (Freezed version)
+    cat > "$base_path/presentation/controller/${name}_state.dart" <<EOF
 part of '${name}_cubit.dart';
 
 @freezed
@@ -493,6 +579,70 @@ class ${className}State with _\$${className}State {
   const factory ${className}State.error(String message) = _Error;
 }
 EOF
+
+  else
+    echo "🧠 Generating Cubit with plain Dart classes..."
+
+    # Cubit file
+    cat > "$base_path/presentation/controller/${name}_cubit.dart" <<EOF
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '${name}_state.dart';
+
+class ${className}Cubit extends Cubit<${className}State> {
+  ${className}Cubit() : super(${className}State.initial());
+
+  Future<void> fetchData() async {
+    emit(${className}State.loading());
+    try {
+      // TODO: Implement data fetching logic
+      await Future.delayed(const Duration(seconds: 1));
+      emit(${className}State.loaded('Data loaded successfully'));
+    } catch (e) {
+      emit(${className}State.error(e.toString()));
+    }
+  }
+}
+EOF
+
+    # State file (Regular Dart version)
+    cat > "$base_path/presentation/controller/${name}_state.dart" <<EOF
+class ${className}State {
+  final bool isLoading;
+  final String? data;
+  final String? error;
+
+  const ${className}State({
+    required this.isLoading,
+    this.data,
+    this.error,
+  });
+
+  factory ${className}State.initial() => const ${className}State(isLoading: false);
+  factory ${className}State.loading() => const ${className}State(isLoading: true);
+  factory ${className}State.loaded(String data) => ${className}State(
+        isLoading: false,
+        data: data,
+      );
+  factory ${className}State.error(String message) => ${className}State(
+        isLoading: false,
+        error: message,
+      );
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    
+    return other is ${className}State &&
+        other.isLoading == isLoading &&
+        other.data == data &&
+        other.error == error;
+  }
+
+  @override
+  int get hashCode => isLoading.hashCode ^ data.hashCode ^ error.hashCode;
+}
+EOF
+  fi
 }
 
 generate_state_management() {
@@ -785,33 +935,15 @@ void main() {
     });
 
     test('should have initial state', () {
-      // arrange
-      final controller = ${className}Controller();
-
-      // act
-      final initialState = controller.build();
-
-      // assert
-      expect(initialState.isLoading, false);
-      expect(initialState.data, null);
-      expect(initialState.error, null);
+      final controller = container.read(${name}ControllerProvider.notifier);
+      expect(controller.state, const ${className}State(isLoading: false));
     });
 
     test('should update state when loading data', () async {
-      // arrange
-      final controller = ${className}Controller();
-      controller.build(); // Initialize
-
-      // act
-      final loadFuture = controller.loadData();
+      final controller = container.read(${name}ControllerProvider.notifier);
       
-      // assert loading state
-      expect(controller.state.isLoading, true);
+      await controller.fetchData();
       
-      // wait for completion
-      await loadFuture;
-      
-      // assert final state
       expect(controller.state.isLoading, false);
       expect(controller.state.data, 'Fetched!');
     });
@@ -819,8 +951,10 @@ void main() {
 }
 EOF
       ;;
+
     "bloc")
-      cat > "test/features/$name/presentation/controller/${name}_bloc_test.dart" <<EOF
+      if [ "$use_freezed" = true ]; then
+        cat > "test/features/$name/presentation/controller/${name}_bloc_test.dart" <<EOF
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../../../../../lib/features/$name/presentation/controller/${name}_bloc.dart';
@@ -842,20 +976,81 @@ void main() {
     });
 
     blocTest<${className}Bloc, ${className}State>(
-      'should emit [loading, loaded] when fetchData is added',
-      build: () => bloc,
+      'should emit [loading, loaded] when FetchData is added',
+      build: () => ${className}Bloc(),
       act: (bloc) => bloc.add(const ${className}Event.fetchData()),
       expect: () => [
         const ${className}State.loading(),
-        const ${className}State.loaded('Fetched!'),
+        const ${className}State.loaded('Fetched data'),
+      ],
+    );
+
+    blocTest<${className}Bloc, ${className}State>(
+      'should emit [loading, error] when FetchData fails',
+      build: () => ${className}Bloc(),
+      act: (bloc) => bloc.add(const ${className}Event.fetchData()),
+      errors: () => [isA<Exception>()],
+      expect: () => [
+        const ${className}State.loading(),
+        const ${className}State.error('Error occurred'),
       ],
     );
   });
 }
 EOF
+      else
+        cat > "test/features/$name/presentation/controller/${name}_bloc_test.dart" <<EOF
+import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../../../../../lib/features/$name/presentation/controller/${name}_bloc.dart';
+import '../../../../../lib/features/$name/presentation/controller/${name}_state.dart';
+import '../../../../../lib/features/$name/presentation/controller/${name}_event.dart';
+
+void main() {
+  group('${className}Bloc', () {
+    late ${className}Bloc bloc;
+
+    setUp(() {
+      bloc = ${className}Bloc();
+    });
+
+    tearDown(() {
+      bloc.close();
+    });
+
+    test('initial state should be initial', () {
+      expect(bloc.state, ${className}State.initial());
+    });
+
+    blocTest<${className}Bloc, ${className}State>(
+      'should emit [loading, loaded] when Fetch${className}Event is added',
+      build: () => ${className}Bloc(),
+      act: (bloc) => bloc.add(Fetch${className}Event()),
+      expect: () => [
+        ${className}State.loading(),
+        ${className}State.loaded('Fetched data'),
+      ],
+    );
+
+    blocTest<${className}Bloc, ${className}State>(
+      'should emit [loading, error] when Fetch${className}Event fails',
+      build: () => ${className}Bloc(),
+      act: (bloc) => bloc.add(Fetch${className}Event()),
+      errors: () => [isA<Exception>()],
+      expect: () => [
+        ${className}State.loading(),
+        ${className}State.error('Error occurred'),
+      ],
+    );
+  });
+}
+EOF
+      fi
       ;;
+
     "cubit")
-      cat > "test/features/$name/presentation/controller/${name}_cubit_test.dart" <<EOF
+      if [ "$use_freezed" = true ]; then
+        cat > "test/features/$name/presentation/controller/${name}_cubit_test.dart" <<EOF
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../../../../../lib/features/$name/presentation/controller/${name}_cubit.dart';
@@ -877,17 +1072,75 @@ void main() {
     });
 
     blocTest<${className}Cubit, ${className}State>(
-      'should emit [loading, loaded] when loadData is called',
-      build: () => cubit,
-      act: (cubit) => cubit.loadData(),
+      'should emit [loading, loaded] when fetchData is called',
+      build: () => ${className}Cubit(),
+      act: (cubit) => cubit.fetchData(),
       expect: () => [
         const ${className}State.loading(),
-        const ${className}State.loaded('Fetched!'),
+        const ${className}State.loaded('Fetched data'),
+      ],
+    );
+
+    blocTest<${className}Cubit, ${className}State>(
+      'should emit [loading, error] when fetchData fails',
+      build: () => ${className}Cubit(),
+      act: (cubit) => cubit.fetchData(),
+      errors: () => [isA<Exception>()],
+      expect: () => [
+        const ${className}State.loading(),
+        const ${className}State.error('Error occurred'),
       ],
     );
   });
 }
 EOF
+      else
+        cat > "test/features/$name/presentation/controller/${name}_cubit_test.dart" <<EOF
+import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../../../../../lib/features/$name/presentation/controller/${name}_cubit.dart';
+import '../../../../../lib/features/$name/presentation/controller/${name}_state.dart';
+
+void main() {
+  group('${className}Cubit', () {
+    late ${className}Cubit cubit;
+
+    setUp(() {
+      cubit = ${className}Cubit();
+    });
+
+    tearDown(() {
+      cubit.close();
+    });
+
+    test('initial state should be initial', () {
+      expect(cubit.state, ${className}State.initial());
+    });
+
+    blocTest<${className}Cubit, ${className}State>(
+      'should emit [loading, loaded] when fetchData is called',
+      build: () => ${className}Cubit(),
+      act: (cubit) => cubit.fetchData(),
+      expect: () => [
+        ${className}State.loading(),
+        ${className}State.loaded('Fetched data'),
+      ],
+    );
+
+    blocTest<${className}Cubit, ${className}State>(
+      'should emit [loading, error] when fetchData fails',
+      build: () => ${className}Cubit(),
+      act: (cubit) => cubit.fetchData(),
+      errors: () => [isA<Exception>()],
+      expect: () => [
+        ${className}State.loading(),
+        ${className}State.error('Error occurred'),
+      ],
+    );
+  });
+}
+EOF
+      fi
       ;;
   esac
 }
@@ -918,39 +1171,61 @@ show_build_runner_reminder() {
 }
 
 show_success_message() {
+  echo ""
   echo "✅ Feature '$name' generated successfully!"
   echo "📦 Add these dependencies to pubspec.yaml:"
-
-  echo "   - dio:"
+  echo ""
+  echo "dependencies:"
+  echo "  dio: ^5.0.0"
   
-  if [[ "$state_mgmt" == "bloc" || "$state_mgmt" == "cubit" ]]; then
-    echo "   - flutter_bloc:"
-  elif [[ "$state_mgmt" == "riverpod" ]]; then
-    echo "   - flutter_riverpod:"
+  # State management
+  if [ -n "$state_mgmt" ]; then
+    case "$state_mgmt" in
+      "riverpod")
+        echo "  flutter_riverpod:"
+        ;;
+      "bloc"|"cubit")
+        echo "  flutter_bloc:"
+        ;;
+    esac
   fi
-
-  if [[ "$model_type" == "freezed-model" ]]; then
-    echo "   - freezed:"
-    echo "   - freezed_annotation:"
-  elif [[ "$model_type" == "equatable" ]]; then
-    echo "   - equatable:"
+  
+  # Freezed + JSON handling
+  if [ "$use_freezed" = true ]; then
+    echo "  freezed_annotation:"
+    echo "  json_annotation:"
   fi
-
-  if [[ "$model_type" == "freezed-model" || "$model_type" == "equatable" ]]; then
-    echo "   - json_annotation:"
-    echo "   - json_serializable:"
+  
+  echo ""
+  echo "dev_dependencies:"
+  
+  if [ "$use_freezed" = true ]; then
+    echo "  build_runner:"
+    echo "  freezed:"
+    echo "  json_serializable:"  # Added json_serializable
   fi
-
+  
+  # Testing
   if [ "$generate_tests" = true ]; then
-    echo ""
-    echo "🧪 Test files generated in test/features/$name/"
-    echo "🧪 Add these to dev_dependencies:"
+    echo "  mocktail:"
+    echo "  flutter_test:"
     if [[ "$state_mgmt" == "bloc" || "$state_mgmt" == "cubit" ]]; then
-      echo "   - bloc_test:"
+      echo "  bloc_test:"
     fi
-    echo "   - flutter_test:"
-    echo "   - mocktail:"
   fi
+
+  echo ""
+  echo "⚙️  Next steps:"
+  
+  if [ "$use_freezed" = true ]; then
+    echo "  - Run: dart run build_runner build:"
+    echo "dart run build_runner build --delete-conflicting-outputs"
+  fi
+  
+  echo "  - Implement your business logic"
+  echo "  - Customize UI components"
+  echo "  - Update API endpoints"
+  echo ""
 }
 
 main() {
