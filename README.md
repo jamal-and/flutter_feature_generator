@@ -46,7 +46,7 @@ cf <feature_name> [state_management] [options]
 - `--cubit` - Cubit pattern (simplified Bloc)
 
 ### Feature Options
-- `freezed` - Use Freezed for immutable models and state classes
+- `--freezed` - Use Freezed for immutable models and state classes
 - `--test` - Generate comprehensive test files
 
 ## 🏗️ Generated Structure
