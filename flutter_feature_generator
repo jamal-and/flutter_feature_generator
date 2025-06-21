@@ -514,17 +514,19 @@ generate_state_management() {
 generate_datasource_tests() {
   cat > "test/features/$name/data/datasources/${name}_remote_datasource_test.dart" <<EOF
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
-import 'package:mockito/annotations.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:dio/dio.dart';
 import '../../../../../lib/features/$name/data/datasources/${name}_remote_datasource_impl.dart';
 
-import '${name}_remote_datasource_test.mocks.dart';
+class MockDio extends Mock implements Dio {}
 
-@GenerateMocks([Dio])
 void main() {
   late ${className}RemoteDataSourceImpl dataSource;
   late MockDio mockDio;
+
+  setUpAll(() {
+    registerFallbackValue(RequestOptions(path: ''));
+  });
 
   setUp(() {
     mockDio = MockDio();
@@ -533,9 +535,8 @@ void main() {
 
   group('${className}RemoteDataSource', () {
     test('should return data when the call is successful', () async {
-      // arrange
       const tResponseData = 'test_data';
-      when(mockDio.get(any)).thenAnswer(
+      when(() => mockDio.get(any())).thenAnswer(
         (_) async => Response(
           data: tResponseData,
           statusCode: 200,
@@ -543,22 +544,18 @@ void main() {
         ),
       );
 
-      // act
       final result = await dataSource.fetchData();
 
-      // assert
       expect(result, tResponseData);
-      verify(mockDio.get('https://api.example.com/$name'));
+      verify(() => mockDio.get('https://api.example.com/$name')).called(1);
     });
 
     test('should throw exception when the call fails', () async {
-      // arrange
-      when(mockDio.get(any)).thenThrow(DioException(
+      when(() => mockDio.get(any())).thenThrow(DioException(
         requestOptions: RequestOptions(path: ''),
         message: 'Network error',
       ));
 
-      // act & assert
       expect(() => dataSource.fetchData(), throwsA(isA<DioException>()));
     });
   });
@@ -578,10 +575,7 @@ void main() {
 
   group('${className}LocalDataSource', () {
     test('should return cached data', () async {
-      // act
       final result = await dataSource.fetchCachedData();
-
-      // assert
       expect(result, 'cached_$name');
     });
   });
@@ -631,8 +625,7 @@ EOF
 generate_repository_tests() {
   cat > "test/features/$name/data/repositories/${name}_repository_impl_test.dart" <<EOF
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
-import 'package:mockito/annotations.dart';
+import 'package:mocktail/mocktail.dart';
 import '../../../../../lib/features/$name/data/datasources/${name}_remote_datasource.dart';
 import '../../../../../lib/features/$name/data/repositories/${name}_repository_impl.dart';
 
@@ -649,11 +642,11 @@ void main() {
 
   group('${className}Repository', () {
     test('should call remote data source when fetching data', () {
-      // act
+      when(() => mockRemoteDataSource.fetchData()).thenAnswer((_) async => 'data');
+
       repository.fetchData();
 
-      // assert
-      verify(mockRemoteDataSource.fetchData());
+      verify(() => mockRemoteDataSource.fetchData()).called(1);
     });
   });
 }
@@ -689,7 +682,7 @@ EOF
 generate_usecase_tests() {
   cat > "test/features/$name/domain/usecases/get_${name}_usecase_test.dart" <<EOF
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
+import 'package:mocktail/mocktail.dart';
 import '../../../../../lib/features/$name/domain/repositories/${name}_repository.dart';
 import '../../../../../lib/features/$name/domain/usecases/get_${name}_usecase.dart';
 
@@ -706,11 +699,11 @@ void main() {
 
   group('Get${className}UseCase', () {
     test('should call repository when executed', () {
-      // act
+      when(() => mockRepository.fetchData()).thenReturn(null);
+
       usecase.call();
 
-      // assert
-      verify(mockRepository.fetchData());
+      verify(() => mockRepository.fetchData()).called(1);
     });
   });
 }
@@ -926,14 +919,37 @@ show_build_runner_reminder() {
 
 show_success_message() {
   echo "✅ Feature '$name' generated successfully!"
+  echo "📦 Add these dependencies to pubspec.yaml:"
+
+  echo "   - dio:"
+  
+  if [[ "$state_mgmt" == "bloc" || "$state_mgmt" == "cubit" ]]; then
+    echo "   - flutter_bloc:"
+  elif [[ "$state_mgmt" == "riverpod" ]]; then
+    echo "   - flutter_riverpod:"
+  fi
+
+  if [[ "$model_type" == "freezed-model" ]]; then
+    echo "   - freezed:"
+    echo "   - freezed_annotation:"
+  elif [[ "$model_type" == "equatable" ]]; then
+    echo "   - equatable:"
+  fi
+
+  if [[ "$model_type" == "freezed-model" || "$model_type" == "equatable" ]]; then
+    echo "   - json_annotation:"
+    echo "   - json_serializable:"
+  fi
+
   if [ "$generate_tests" = true ]; then
+    echo ""
     echo "🧪 Test files generated in test/features/$name/"
-    echo "📦 Don't forget to add these dependencies to dev_dependencies:"
-    echo "   - mockito:"
-    echo "   - build_runner:"
+    echo "🧪 Add these to dev_dependencies:"
     if [[ "$state_mgmt" == "bloc" || "$state_mgmt" == "cubit" ]]; then
       echo "   - bloc_test:"
     fi
+    echo "   - flutter_test:"
+    echo "   - mocktail:"
   fi
 }
 
