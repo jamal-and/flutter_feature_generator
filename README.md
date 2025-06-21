@@ -171,11 +171,11 @@ The script automatically suggests required dependencies based on your choices:
 ```yaml
 dependencies:
   dio: ^5.3.2
-  flutter_riverpod: ^2.4.5  # if --riverpod
-  flutter_bloc: ^8.1.3      # if --bloc or --cubit
-  freezed: ^2.4.6            # if --freezed-model
-  equatable: ^2.0.5          # if --equatable
-  json_annotation: ^4.8.1
+  flutter_riverpod:   # if --riverpod
+  flutter_bloc:       # if --bloc or --cubit
+  freezed:            # if --freezed-model
+  equatable:          # if --equatable
+  json_annotation: 
 ```
 
 ### Dev Dependencies
@@ -183,11 +183,11 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  mocktail: ^1.0.0
-  bloc_test: ^9.1.4          # if --bloc or --cubit
-  build_runner: ^2.4.7       # if using Freezed
-  freezed: ^2.4.6            # if --freezed-model
-  json_serializable: ^6.7.1
+  mocktail: 
+  bloc_test:           # if --bloc or --cubit
+  build_runner:        # if using Freezed
+  freezed:             # if --freezed-model
+  json_serializable: 
 ```
 
 ## 🔧 Advanced Usage
