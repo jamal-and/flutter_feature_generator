@@ -7,59 +7,59 @@ echo "----------------------------------------"
 
 # ============ 1. Riverpod Combinations ============
 echo "TEST GROUP 1: Riverpod Variations"
-cf "Riverpod_Basic" --riverpod
-cf "Riverpod_Freezed" --riverpod --freezed
-cf "Riverpod_Tests" --riverpod --test
-cf "Riverpod_Full" --riverpod --freezed --test
+flutter_feature_generator "Riverpod_Basic" --riverpod
+flutter_feature_generator "Riverpod_Freezed" --riverpod --freezed
+flutter_feature_generator "Riverpod_Tests" --riverpod --test
+flutter_feature_generator "Riverpod_Full" --riverpod --freezed --test
 echo "----------------------------------------"
 
 # ============ 2. BLoC Combinations ============
 echo "TEST GROUP 2: BLoC Variations"
-cf "Bloc_Basic" --bloc
-cf "Bloc_Freezed" --bloc --freezed
-cf "Bloc_Tests" --bloc --test
-cf "Bloc_Full" --bloc --freezed --test
+flutter_feature_generator "Bloc_Basic" --bloc
+flutter_feature_generator "Bloc_Freezed" --bloc --freezed
+flutter_feature_generator "Bloc_Tests" --bloc --test
+flutter_feature_generator "Bloc_Full" --bloc --freezed --test
 echo "----------------------------------------"
 
 # ============ 3. Cubit Combinations ============
 echo "TEST GROUP 3: Cubit Variations"
-cf "Cubit_Basic" --cubit
-cf "Cubit_Freezed" --cubit --freezed
-cf "Cubit_Tests" --cubit --test
-cf "Cubit_Full" --cubit --freezed --test
+flutter_feature_generator "Cubit_Basic" --cubit
+flutter_feature_generator "Cubit_Freezed" --cubit --freezed
+flutter_feature_generator "Cubit_Tests" --cubit --test
+flutter_feature_generator "Cubit_Full" --cubit --freezed --test
 echo "----------------------------------------"
 
 # ============ 4. Minimal Features ============
 echo "TEST GROUP 4: No State Management"
-cf "Minimal_Basic"
-cf "Minimal_Freezed" --freezed
-cf "Minimal_Tests" --test
-cf "Minimal_Full" --freezed --test
+flutter_feature_generator "Minimal_Basic"
+flutter_feature_generator "Minimal_Freezed" --freezed
+flutter_feature_generator "Minimal_Tests" --test
+flutter_feature_generator "Minimal_Full" --freezed --test
 echo "----------------------------------------"
 
 # ============ 5. Edge Cases ============
 echo "TEST GROUP 5: Edge Cases"
-cf "Edge_Numbers123" --riverpod --freezed
-cf "Edge_Hyphen-Name" --bloc --test
-cf "Edge_Long Name With Spaces" --cubit --freezed
-cf "Edge_X" --riverpod  # Shortest possible name
+flutter_feature_generator "Edge_Numbers123" --riverpod --freezed
+flutter_feature_generator "Edge_Hyphen-Name" --bloc --test
+flutter_feature_generator "Edge_Long Name With Spaces" --cubit --freezed
+flutter_feature_generator "Edge_X" --riverpod  # Shortest possible name
 echo "----------------------------------------"
 
 # ============ 6. Error Cases ============
 echo "TEST GROUP 6: Expected Failures"
-cf  # Should fail - no name
-cf "Error_Conflict1" --riverpod --bloc  # Should fail
-cf "Error_Conflict2" --bloc --cubit  # Should fail
-cf "Error_BadFlag" --invalid-flag  # Should fail
-cf --riverpod  # Should fail - no name
+flutter_feature_generator  # Should fail - no name
+flutter_feature_generator "Error_Conflict1" --riverpod --bloc  # Should fail
+flutter_feature_generator "Error_Conflict2" --bloc --cubit  # Should fail
+flutter_feature_generator "Error_BadFlag" --invalid-flag  # Should fail
+flutter_feature_generator --riverpod  # Should fail - no name
 echo "----------------------------------------"
 
 # ============ 7. Real-world Examples ============
 echo "TEST GROUP 7: Real-world Scenarios"
-cf "Real_PlayerProfile" --bloc --freezed --test
-cf "Real_MatchDetails" --riverpod --freezed --test
-cf "Real_AppSettings" --riverpod --test
-cf "Real_Analytics" --cubit
+flutter_feature_generator "Real_PlayerProfile" --bloc --freezed --test
+flutter_feature_generator "Real_MatchDetails" --riverpod --freezed --test
+flutter_feature_generator "Real_AppSettings" --riverpod --test
+flutter_feature_generator "Real_Analytics" --cubit
 echo "----------------------------------------"
 
 echo "Test Suite Completed!"
