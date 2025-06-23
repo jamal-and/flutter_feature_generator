@@ -20,7 +20,7 @@ git clone https://github.com/jamal-and/flutter_feature_generator.git
 cd flutter_feature_generator
 ./install.sh
 source ~/.zshrc    # or source ~/.bashrc
-
+```
 ### Basic Usage
 
 ```bash
