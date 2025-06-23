@@ -1254,7 +1254,10 @@ main() {
   generate_test_layer
 
   # Show final reminders and success message
+  if [ "$use_freezed" = true ]; then
   show_build_runner_reminder
+  fi
+  
   show_success_message
 }
 
