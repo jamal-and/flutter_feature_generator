@@ -735,7 +735,6 @@ EOF
 
 generate_model_tests() {
   cat > "test/features/$name/data/models/${name}_model_test.dart" <<EOF
-import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import '../../../../../lib/features/$name/data/models/${name}_model.dart';
 
